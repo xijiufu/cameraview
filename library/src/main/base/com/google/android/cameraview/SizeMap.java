@@ -63,11 +63,11 @@ class SizeMap {
         mRatios.remove(ratio);
     }
 
-    Set<AspectRatio> ratios() {
+    public Set<AspectRatio> ratios() {
         return mRatios.keySet();
     }
 
-    SortedSet<Size> sizes(AspectRatio ratio) {
+    public SortedSet<Size> sizes(AspectRatio ratio) {
         return mRatios.get(ratio);
     }
 

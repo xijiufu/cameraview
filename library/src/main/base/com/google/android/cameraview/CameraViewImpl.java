@@ -16,6 +16,7 @@
 
 package com.google.android.cameraview;
 
+import android.media.MediaRecorder;
 import android.view.View;
 
 import java.util.Set;
@@ -67,7 +68,12 @@ abstract class CameraViewImpl {
 
     abstract void takePicture();
 
+
     abstract void setDisplayOrientation(int displayOrientation);
+
+    abstract void startVideoRecord(MediaRecorder mediaRecorder, int width, int height);
+
+    abstract void stopVideoRecord(MediaRecorder mediaRecorder);
 
     interface Callback {
 
@@ -76,6 +82,12 @@ abstract class CameraViewImpl {
         void onCameraClosed();
 
         void onPictureTaken(byte[] data);
+
+        void onMediaRecordInit();
+
+        void onVideoRecordStart();
+
+        void onVideoRecordStop();
 
     }
 

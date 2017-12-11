@@ -19,11 +19,13 @@ package com.google.android.cameraview;
 import android.annotation.SuppressLint;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.support.v4.util.SparseArrayCompat;
 import android.view.SurfaceHolder;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
@@ -58,6 +60,8 @@ class Camera1 extends CameraViewImpl {
     private final SizeMap mPreviewSizes = new SizeMap();
 
     private final SizeMap mPictureSizes = new SizeMap();
+
+    private final List<Camera.Size> mVideoSizes = new ArrayList<>();
 
     private AspectRatio mAspectRatio;
 
@@ -235,6 +239,53 @@ class Camera1 extends CameraViewImpl {
             takePictureInternal();
         }
     }
+    private boolean isVideoRecording = false;
+    @Override
+    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height) {
+        if (!isCameraOpened()) {
+            throw new IllegalStateException(
+                    "Camera is not ready. Call start() before startVideoRecord().");
+        }
+        if (mediaRecorder == null) {
+            throw new IllegalStateException(
+                    "mediaRecorder is null.");
+        }
+        //方向
+        mediaRecorder.setOrientationHint(calcCameraRotation(mDisplayOrientation));
+        CameraSize videoSize = getOptimalSize(mVideoSizes,width,height);
+        //分辨率
+        mediaRecorder.setVideoSize(videoSize.getWidth(),videoSize.getHeight());
+        //camera
+        mediaRecorder.setCamera(mCamera);
+
+        try {
+            mediaRecorder.prepare();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        mCallback.onMediaRecordInit();
+
+        mediaRecorder.start();
+        isVideoRecording  = true;
+        mCallback.onVideoRecordStart();
+    }
+
+    @Override
+    void stopVideoRecord(MediaRecorder mediaRecorder) {
+        if (mediaRecorder == null) {
+            throw new IllegalStateException(
+                    "MediaRecorder is null.");
+        }
+        if (!isVideoRecording){
+            throw new IllegalStateException(
+                    "VideoRecord not start.");
+        }
+
+        mediaRecorder.stop();
+        mCallback.onVideoRecordStop();
+    }
 
     void takePictureInternal() {
         if (!isPictureCaptureInProgress.getAndSet(true)) {
@@ -299,6 +350,11 @@ class Camera1 extends CameraViewImpl {
         mPictureSizes.clear();
         for (Camera.Size size : mCameraParameters.getSupportedPictureSizes()) {
             mPictureSizes.add(new Size(size.width, size.height));
+        }
+        //Supported video sizes;
+        mVideoSizes.clear();
+        for (Camera.Size size : mCameraParameters.getSupportedVideoSizes()) {
+            mVideoSizes.add(size);
         }
         // AspectRatio
         if (mAspectRatio == null) {
@@ -372,6 +428,9 @@ class Camera1 extends CameraViewImpl {
         return result;
     }
 
+
+
+
     private void releaseCamera() {
         if (mCamera != null) {
             mCamera.release();
@@ -382,7 +441,8 @@ class Camera1 extends CameraViewImpl {
 
     /**
      * Calculate display orientation
-     * https://developer.android.com/reference/android/hardware/Camera.html#setDisplayOrientation(int)
+     * https://developer.android.com/reference/android/hardware/Camera.html#setDisplayOrientation
+     * (int)
      *
      * This calculation is used for orienting the preview
      *
@@ -475,6 +535,63 @@ class Camera1 extends CameraViewImpl {
             mFlash = flash;
             return false;
         }
+    }
+
+    /**
+     * Copyright (C) 2013 The Android Open Source Project
+     * <p/>
+     * Licensed under the Apache License, Version 2.0 (the "License");
+     * you may not use this file except in compliance with the License.
+     * You may obtain a copy of the License at
+     * <p/>
+     * http://www.apache.org/licenses/LICENSE-2.0
+     * <p/>
+     * Unless required by applicable law or agreed to in writing, software
+     * distributed under the License is distributed on an "AS IS" BASIS,
+     * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     * See the License for the specific language governing permissions and
+     * limitations under the License.
+     */
+    public CameraSize getOptimalSize(List<Camera.Size> sizes, int w, int h) {
+        // Use a very small tolerance because we want an exact match.
+        final double ASPECT_TOLERANCE = 0.1;
+        final double targetRatio = (double) w / h;
+        if (sizes == null) return null;
+
+        Camera.Size optimalSize = null;
+
+        // Start with max value and refine as we iterate over available preview sizes. This is the
+        // minimum difference between view and camera height.
+        double minDiff = Double.MAX_VALUE;
+
+        // Target view height
+        final int targetHeight = h;
+
+        // Try to find a preview size that matches aspect ratio and the target view size.
+        // Iterate over all available sizes and pick the largest size that can fit in the view and
+        // still maintain the aspect ratio.
+        for (final Camera.Size size : sizes) {
+            final double ratio = (double) size.width / size.height;
+            if (Math.abs(ratio - targetRatio) > ASPECT_TOLERANCE) {
+                continue;
+            }
+            if (Math.abs(size.height - targetHeight) < minDiff) {
+                optimalSize = size;
+                minDiff = Math.abs(size.height - targetHeight);
+            }
+        }
+
+        // Cannot find preview size that matches the aspect ratio, ignore the requirement
+        if (optimalSize == null) {
+            minDiff = Double.MAX_VALUE;
+            for (final Camera.Size size : sizes) {
+                if (Math.abs(size.height - targetHeight) < minDiff) {
+                    optimalSize = size;
+                    minDiff = Math.abs(size.height - targetHeight);
+                }
+            }
+        }
+        return new CameraSize(optimalSize.width, optimalSize.height);
     }
 
 }

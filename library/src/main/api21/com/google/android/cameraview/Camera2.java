@@ -17,26 +17,33 @@
 package com.google.android.cameraview;
 
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.ImageFormat;
+import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaRecorder;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.Surface;
+import android.widget.Toast;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 
@@ -45,7 +52,7 @@ import java.util.SortedSet;
 class Camera2 extends CameraViewImpl {
 
     private static final String TAG = "Camera2";
-
+    //前后摄像头
     private static final SparseIntArray INTERNAL_FACINGS = new SparseIntArray();
 
     static {
@@ -128,27 +135,17 @@ class Camera2 extends CameraViewImpl {
 
     };
 
-    PictureCaptureCallback mCaptureCallback = new PictureCaptureCallback() {
+
+    VideoRecordCallback mCaptureCallback = new VideoRecordCallback() {
+        @Override
+        public void onVideoRecordStart() {
+            mCallback.onVideoRecordStart();
+        }
 
         @Override
         public void onPrecaptureRequired() {
-            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
-                    CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_START);
-            setState(STATE_PRECAPTURE);
-            try {
-                mCaptureSession.capture(mPreviewRequestBuilder.build(), this, null);
-                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
-                        CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_IDLE);
-            } catch (CameraAccessException e) {
-                Log.e(TAG, "Failed to run precapture sequence.", e);
-            }
-        }
 
-        @Override
-        public void onReady() {
-            captureStillPicture();
         }
-
     };
 
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
@@ -341,10 +338,35 @@ class Camera2 extends CameraViewImpl {
         }
     }
 
+
     @Override
     void setDisplayOrientation(int displayOrientation) {
         mDisplayOrientation = displayOrientation;
         mPreview.setDisplayOrientation(mDisplayOrientation);
+    }
+
+    MediaRecorder mMediaRecorder;
+
+    @Override
+    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height) {
+        mMediaRecorder = mediaRecorder;
+        android.util.Size videoSize = getOptimalSize(mVideoSizes,width,height);
+        //屏幕方向
+        mMediaRecorder.setVideoSize(videoSize.getWidth(),videoSize.getHeight());
+
+        try {
+            mMediaRecorder.prepare();
+            mCallback.onMediaRecordInit();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        startVideoRecordSession(mediaRecorder);
+    }
+
+    @Override
+    void stopVideoRecord(MediaRecorder mediaRecorder) {
+        mediaRecorder.stop();
+        mCallback.onVideoRecordStop();
     }
 
     /**
@@ -405,6 +427,8 @@ class Camera2 extends CameraViewImpl {
         }
     }
 
+    List<android.util.Size>  mVideoSizes;
+
     /**
      * <p>Collects some information from {@link #mCameraCharacteristics}.</p>
      * <p>This rewrites {@link #mPreviewSizes}, {@link #mPictureSizes}, and optionally,
@@ -431,6 +455,8 @@ class Camera2 extends CameraViewImpl {
                 mPreviewSizes.remove(ratio);
             }
         }
+
+        mVideoSizes = Arrays.asList(map.getOutputSizes(MediaRecorder.class));
 
         if (!mPreviewSizes.ratios().contains(mAspectRatio)) {
             mAspectRatio = mPreviewSizes.ratios().iterator().next();
@@ -471,7 +497,7 @@ class Camera2 extends CameraViewImpl {
      * <p>The result will be continuously processed in {@link #mSessionCallback}.</p>
      */
     void startCaptureSession() {
-        if (!isCameraOpened() || !mPreview.isReady() || mImageReader == null) {
+        if (!isCameraOpened() || !mPreview.isReady() ) {
             return;
         }
         Size previewSize = chooseOptimalSize();
@@ -480,7 +506,11 @@ class Camera2 extends CameraViewImpl {
         try {
             mPreviewRequestBuilder = mCamera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             mPreviewRequestBuilder.addTarget(surface);
-            mCamera.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),
+            List<Surface> surfaces = Arrays.asList(surface);
+            if (mMediaRecorder!=null){
+                surfaces.add(mMediaRecorder.getSurface());
+            }
+            mCamera.createCaptureSession(surfaces,
                     mSessionCallback, null);
         } catch (CameraAccessException e) {
             throw new RuntimeException("Failed to start camera session");
@@ -583,7 +613,7 @@ class Camera2 extends CameraViewImpl {
         mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
                 CaptureRequest.CONTROL_AF_TRIGGER_START);
         try {
-            mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
+//            mCaptureCallback.setState(PictureCaptureCallback.STATE_LOCKING);
             mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
         } catch (CameraAccessException e) {
             Log.e(TAG, "Failed to lock focus.", e);
@@ -642,7 +672,7 @@ class Camera2 extends CameraViewImpl {
                         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                 @NonNull CaptureRequest request,
                                 @NonNull TotalCaptureResult result) {
-                            unlockFocus();
+//                            unlockFocus();
                         }
                     }, null);
         } catch (CameraAccessException e) {
@@ -650,111 +680,170 @@ class Camera2 extends CameraViewImpl {
         }
     }
 
+
     /**
-     * Unlocks the auto-focus and restart camera preview. This is supposed to be called after
-     * capturing a still picture.
+     * Captures a still picture.
      */
-    void unlockFocus() {
-        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                CaptureRequest.CONTROL_AF_TRIGGER_CANCEL);
+    void startVideoRecordSession(MediaRecorder mediaRecorder) {
         try {
-            mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, null);
-            updateAutoFocus();
-            updateFlash();
-            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                    CaptureRequest.CONTROL_AF_TRIGGER_IDLE);
-            mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    null);
-            mCaptureCallback.setState(PictureCaptureCallback.STATE_PREVIEW);
+            CaptureRequest.Builder captureRequestBuilder = mCamera.createCaptureRequest(
+                    CameraDevice.TEMPLATE_RECORD);
+            captureRequestBuilder.addTarget(mediaRecorder.getSurface());
+            captureRequestBuilder.addTarget(mPreview.getSurface());
+            captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                    mPreviewRequestBuilder.get(CaptureRequest.CONTROL_AF_MODE));
+            switch (mFlash) {
+                case Constants.FLASH_OFF:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_ON);
+                    captureRequestBuilder.set(CaptureRequest.FLASH_MODE,
+                            CaptureRequest.FLASH_MODE_OFF);
+                    break;
+                case Constants.FLASH_ON:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
+                    break;
+                case Constants.FLASH_TORCH:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_ON);
+                    captureRequestBuilder.set(CaptureRequest.FLASH_MODE,
+                            CaptureRequest.FLASH_MODE_TORCH);
+                    break;
+                case Constants.FLASH_AUTO:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+                    break;
+                case Constants.FLASH_RED_EYE:
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+                            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+                    break;
+            }
+            // Calculate JPEG orientation.
+            @SuppressWarnings("ConstantConditions")
+            int sensorOrientation = mCameraCharacteristics.get(
+                    CameraCharacteristics.SENSOR_ORIENTATION);
+            captureRequestBuilder.set(CaptureRequest.JPEG_ORIENTATION,
+                    (sensorOrientation +
+                            mDisplayOrientation * (mFacing == Constants.FACING_FRONT ? 1 : -1) +
+                            360) % 360);
+
+
+            // Start a capture session
+            // Once the session starts, we can update the UI and start recording
+            mCamera.createCaptureSession(Arrays.asList(mPreview.getSurface(),mediaRecorder.getSurface()), mSessionCallback, null);
         } catch (CameraAccessException e) {
-            Log.e(TAG, "Failed to restart camera preview.", e);
+            e.printStackTrace();
         }
     }
+
+
 
     /**
      * A {@link CameraCaptureSession.CaptureCallback} for capturing a still picture.
      */
-    private static abstract class PictureCaptureCallback
+    private static abstract class VideoRecordCallback
             extends CameraCaptureSession.CaptureCallback {
 
-        static final int STATE_PREVIEW = 0;
-        static final int STATE_LOCKING = 1;
-        static final int STATE_LOCKED = 2;
-        static final int STATE_PRECAPTURE = 3;
-        static final int STATE_WAITING = 4;
-        static final int STATE_CAPTURING = 5;
-
-        private int mState;
-
-        PictureCaptureCallback() {
-        }
-
-        void setState(int state) {
-            mState = state;
+        @Override
+        public void onCaptureStarted(@NonNull CameraCaptureSession session,
+                @NonNull CaptureRequest request, long timestamp, long frameNumber) {
+            onVideoRecordStart();
         }
 
         @Override
         public void onCaptureProgressed(@NonNull CameraCaptureSession session,
                 @NonNull CaptureRequest request, @NonNull CaptureResult partialResult) {
-            process(partialResult);
         }
 
         @Override
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                 @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
-            process(result);
         }
 
-        private void process(@NonNull CaptureResult result) {
-            switch (mState) {
-                case STATE_LOCKING: {
-                    Integer af = result.get(CaptureResult.CONTROL_AF_STATE);
-                    if (af == null) {
-                        break;
-                    }
-                    if (af == CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED ||
-                            af == CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED) {
-                        Integer ae = result.get(CaptureResult.CONTROL_AE_STATE);
-                        if (ae == null || ae == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
-                            setState(STATE_CAPTURING);
-                            onReady();
-                        } else {
-                            setState(STATE_LOCKED);
-                            onPrecaptureRequired();
-                        }
-                    }
-                    break;
-                }
-                case STATE_PRECAPTURE: {
-                    Integer ae = result.get(CaptureResult.CONTROL_AE_STATE);
-                    if (ae == null || ae == CaptureResult.CONTROL_AE_STATE_PRECAPTURE ||
-                            ae == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED ||
-                            ae == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
-                        setState(STATE_WAITING);
-                    }
-                    break;
-                }
-                case STATE_WAITING: {
-                    Integer ae = result.get(CaptureResult.CONTROL_AE_STATE);
-                    if (ae == null || ae != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
-                        setState(STATE_CAPTURING);
-                        onReady();
-                    }
-                    break;
-                }
-            }
+        @Override
+        public void onCaptureFailed(@NonNull CameraCaptureSession session,
+                @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
         }
 
+        @Override
+        public void onCaptureSequenceCompleted(@NonNull CameraCaptureSession session,
+                int sequenceId,
+                long frameNumber) {
+        }
+
+        @Override
+        public void onCaptureSequenceAborted(@NonNull CameraCaptureSession session,
+                int sequenceId) {
+        }
         /**
          * Called when it is ready to take a still picture.
          */
-        public abstract void onReady();
+        public abstract void onVideoRecordStart();
 
         /**
          * Called when it is necessary to run the precapture sequence.
          */
         public abstract void onPrecaptureRequired();
 
+
+    }
+
+
+    /**
+     * Copyright (C) 2013 The Android Open Source Project
+     * <p/>
+     * Licensed under the Apache License, Version 2.0 (the "License");
+     * you may not use this file except in compliance with the License.
+     * You may obtain a copy of the License at
+     * <p/>
+     * http://www.apache.org/licenses/LICENSE-2.0
+     * <p/>
+     * Unless required by applicable law or agreed to in writing, software
+     * distributed under the License is distributed on an "AS IS" BASIS,
+     * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     * See the License for the specific language governing permissions and
+     * limitations under the License.
+     */
+    public android.util.Size getOptimalSize(List<android.util.Size> sizes, int w, int h) {
+        // Use a very small tolerance because we want an exact match.
+        final double ASPECT_TOLERANCE = 0.1;
+        final double targetRatio = (double) w / h;
+        if (sizes == null) return null;
+
+        android.util.Size optimalSize = null;
+
+        // Start with max value and refine as we iterate over available preview sizes. This is the
+        // minimum difference between view and camera height.
+        double minDiff = Double.MAX_VALUE;
+
+        // Target view height
+        final int targetHeight = h;
+
+        // Try to find a preview size that matches aspect ratio and the target view size.
+        // Iterate over all available sizes and pick the largest size that can fit in the view and
+        // still maintain the aspect ratio.
+        for (final android.util.Size size : sizes) {
+            final double ratio = (double) size.getWidth() / size.getHeight();
+            if (Math.abs(ratio - targetRatio) > ASPECT_TOLERANCE) {
+                continue;
+            }
+            if (Math.abs(size.getHeight() - targetHeight) < minDiff) {
+                optimalSize = size;
+                minDiff = Math.abs(size.getHeight() - targetHeight);
+            }
+        }
+
+        // Cannot find preview size that matches the aspect ratio, ignore the requirement
+        if (optimalSize == null) {
+            minDiff = Double.MAX_VALUE;
+            for (final android.util.Size size : sizes) {
+                if (Math.abs(size.getHeight() - targetHeight) < minDiff) {
+                    optimalSize = size;
+                    minDiff = Math.abs(size.getHeight() - targetHeight);
+                }
+            }
+        }
+        return optimalSize;
     }
 
 }

@@ -16,10 +16,13 @@
 
 package com.google.android.cameraview.demo;
 
+import static android.os.Environment.getExternalStoragePublicDirectory;
+
 import android.Manifest;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -96,12 +99,18 @@ public class MainActivity extends AppCompatActivity implements
             switch (v.getId()) {
                 case R.id.take_picture:
                     if (mCameraView != null) {
-                        mCameraView.takePicture();
+//                        mCameraView.takePicture();
+                        String dir = getExternalFilesDir(null).getAbsolutePath()+"/picture.mp4";
+                        Log.e(TAG, "onClick: "+ dir );
+                        mCameraView.initMediaRecorder(dir);
+                        mCameraView.startVideoRecord(854,480);
                     }
                     break;
             }
         }
     };
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -121,6 +130,8 @@ public class MainActivity extends AppCompatActivity implements
         if (actionBar != null) {
             actionBar.setDisplayShowTitleEnabled(false);
         }
+
+
     }
 
     @Override
@@ -189,14 +200,15 @@ public class MainActivity extends AppCompatActivity implements
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.aspect_ratio:
-                FragmentManager fragmentManager = getSupportFragmentManager();
-                if (mCameraView != null
-                        && fragmentManager.findFragmentByTag(FRAGMENT_DIALOG) == null) {
-                    final Set<AspectRatio> ratios = mCameraView.getSupportedAspectRatios();
-                    final AspectRatio currentRatio = mCameraView.getAspectRatio();
-                    AspectRatioFragment.newInstance(ratios, currentRatio)
-                            .show(fragmentManager, FRAGMENT_DIALOG);
-                }
+//                FragmentManager fragmentManager = getSupportFragmentManager();
+//                if (mCameraView != null
+//                        && fragmentManager.findFragmentByTag(FRAGMENT_DIALOG) == null) {
+//                    final Set<AspectRatio> ratios = mCameraView.getSupportedAspectRatios();
+//                    final AspectRatio currentRatio = mCameraView.getAspectRatio();
+//                    AspectRatioFragment.newInstance(ratios, currentRatio)
+//                            .show(fragmentManager, FRAGMENT_DIALOG);
+//                }
+                mCameraView.stopVideoRecord();
                 return true;
             case R.id.switch_flash:
                 if (mCameraView != null) {

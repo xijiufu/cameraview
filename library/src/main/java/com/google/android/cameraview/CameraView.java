@@ -19,6 +19,7 @@ package com.google.android.cameraview;
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -449,6 +450,20 @@ public class CameraView extends FrameLayout {
             }
         }
 
+        @Override
+        public void onMediaRecordInit() {
+        }
+
+        @Override
+        public void onVideoRecordStart() {
+
+        }
+
+        @Override
+        public void onVideoRecordStop() {
+
+        }
+
         public void reserveRequestLayoutOnOpen() {
             mRequestLayoutOnOpen = true;
         }
@@ -536,5 +551,39 @@ public class CameraView extends FrameLayout {
         public void onPictureTaken(CameraView cameraView, byte[] data) {
         }
     }
+
+
+    public void initMediaRecorder(String videoPath) {
+        if (mMediaRecorder == null) {
+            mMediaRecorder = new MediaRecorder();
+        }
+        //输入音视频源
+        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+        //输出格式
+        mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+        //文件路径
+        mMediaRecorder.setOutputFile(videoPath);
+        //编码比特率
+        mMediaRecorder.setVideoEncodingBitRate(10 * 1024 * 1024);
+        //帧率
+        mMediaRecorder.setVideoFrameRate(30);
+        //视频编码格式
+        mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+        //音频编码格式
+        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+    }
+
+    public void startVideoRecord(int width, int height) {
+        //Todo 屏幕方向，分辨率，camera
+        mImpl.startVideoRecord(mMediaRecorder,width,height);
+    }
+
+    public void stopVideoRecord() {
+        mImpl.stopVideoRecord(mMediaRecorder);
+    }
+
+
+    MediaRecorder mMediaRecorder;
 
 }
