@@ -60,7 +60,7 @@ public class MainActivity extends AppCompatActivity implements
         ActivityCompat.OnRequestPermissionsResultCallback,
         AspectRatioFragment.Listener {
 
-    private static final String TAG = "MainActivity";
+    private static final String TAG = "MainActivity1";
 
     private static final int REQUEST_CAMERA_PERMISSION = 1;
 
