@@ -32,6 +32,7 @@ import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.widget.FrameLayout;
 
+import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -405,7 +406,6 @@ public class CameraView extends FrameLayout {
      * {@link Callback#onPictureTaken(CameraView, byte[])}.
      */
     public void takePicture() {
-        mImpl.takePicture();
     }
 
     private class CallbackBridge implements CameraViewImpl.Callback {
@@ -452,16 +452,22 @@ public class CameraView extends FrameLayout {
 
         @Override
         public void onMediaRecordInit() {
+            try {
+                mMediaRecorder.prepare();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
         public void onVideoRecordStart() {
-
+            mMediaRecorder.start();
         }
 
         @Override
         public void onVideoRecordStop() {
-
+            mMediaRecorder.stop();
+            mMediaRecorder.reset();
         }
 
         public void reserveRequestLayoutOnOpen() {

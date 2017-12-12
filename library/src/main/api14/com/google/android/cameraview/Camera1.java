@@ -221,24 +221,6 @@ class Camera1 extends CameraViewImpl {
         return mFlash;
     }
 
-    @Override
-    void takePicture() {
-        if (!isCameraOpened()) {
-            throw new IllegalStateException(
-                    "Camera is not ready. Call start() before takePicture().");
-        }
-        if (getAutoFocus()) {
-            mCamera.cancelAutoFocus();
-            mCamera.autoFocus(new Camera.AutoFocusCallback() {
-                @Override
-                public void onAutoFocus(boolean success, Camera camera) {
-                    takePictureInternal();
-                }
-            });
-        } else {
-            takePictureInternal();
-        }
-    }
     private boolean isVideoRecording = false;
     @Override
     void startVideoRecord(MediaRecorder mediaRecorder, int width, int height) {

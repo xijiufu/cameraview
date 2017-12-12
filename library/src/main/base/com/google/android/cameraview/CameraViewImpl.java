@@ -66,9 +66,6 @@ abstract class CameraViewImpl {
 
     abstract int getFlash();
 
-    abstract void takePicture();
-
-
     abstract void setDisplayOrientation(int displayOrientation);
 
     abstract void startVideoRecord(MediaRecorder mediaRecorder, int width, int height);
