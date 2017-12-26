@@ -223,7 +223,7 @@ class Camera1 extends CameraViewImpl {
 
     private boolean isVideoRecording = false;
     @Override
-    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height) {
+    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height,int oritation) {
         if (!isCameraOpened()) {
             throw new IllegalStateException(
                     "Camera is not ready. Call start() before startVideoRecord().");

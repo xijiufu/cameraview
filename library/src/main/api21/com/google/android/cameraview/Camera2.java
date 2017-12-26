@@ -144,7 +144,7 @@ class Camera2 extends CameraViewImpl {
             mVideoSession = session;
             //自动对焦
             updateAutoFocus();
-            //曝光
+            //曝光mVideoSessionCallback
             updateFlash();
             try {
                 mVideoSession.setRepeatingRequest(mVideoRequestBuilder.build(), null, null);
@@ -164,14 +164,12 @@ class Camera2 extends CameraViewImpl {
 
         @Override
         public void onClosed(@NonNull CameraCaptureSession session) {
-            if (mPreviewSession != null && mPreviewSession.equals(session)) {
-                mPreviewSession = null;
+            if (mVideoSession != null && mVideoSession.equals(session)) {
+                mVideoSession = null;
             }
         }
 
     };
-
-
 
 
     private String mCameraId;
@@ -353,10 +351,38 @@ class Camera2 extends CameraViewImpl {
         mPreview.setDisplayOrientation(mDisplayOrientation);
     }
 
+    private static final int SENSOR_ORIENTATION_DEFAULT_DEGREES = 90;
+    private static final int SENSOR_ORIENTATION_INVERSE_DEGREES = 270;
+    private static final SparseIntArray DEFAULT_ORIENTATIONS = new SparseIntArray();
+    private static final SparseIntArray INVERSE_ORIENTATIONS = new SparseIntArray();
+
+    static {
+        DEFAULT_ORIENTATIONS.append(Surface.ROTATION_0, 90);
+        DEFAULT_ORIENTATIONS.append(Surface.ROTATION_90, 0);
+        DEFAULT_ORIENTATIONS.append(Surface.ROTATION_180, 270);
+        DEFAULT_ORIENTATIONS.append(Surface.ROTATION_270, 180);
+    }
+
+    static {
+        INVERSE_ORIENTATIONS.append(Surface.ROTATION_0, 270);
+        INVERSE_ORIENTATIONS.append(Surface.ROTATION_90, 180);
+        INVERSE_ORIENTATIONS.append(Surface.ROTATION_180, 90);
+        INVERSE_ORIENTATIONS.append(Surface.ROTATION_270, 0);
+    }
+
     @Override
-    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height) {
+    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height, int oritation) {
         android.util.Size videoSize = getOptimalSize(mVideoSizes, width, height);
         //屏幕方向
+        switch (mSensorOrientation) {
+            case SENSOR_ORIENTATION_DEFAULT_DEGREES:
+                mediaRecorder.setOrientationHint(DEFAULT_ORIENTATIONS.get(oritation));
+                break;
+            case SENSOR_ORIENTATION_INVERSE_DEGREES:
+                mediaRecorder.setOrientationHint(INVERSE_ORIENTATIONS.get(oritation));
+                break;
+        }
+
         mediaRecorder.setVideoSize(videoSize.getWidth(), videoSize.getHeight());
 
         mCallback.onMediaRecordInit();
@@ -367,7 +393,7 @@ class Camera2 extends CameraViewImpl {
     @Override
     void stopVideoRecord(MediaRecorder mediaRecorder) {
         mCallback.onVideoRecordStop();
-
+        startPreviewSession();
     }
 
     /**
@@ -388,14 +414,14 @@ class Camera2 extends CameraViewImpl {
             for (String id : ids) {
                 //相机特性对象
                 CameraCharacteristics characteristics = mCameraManager.getCameraCharacteristics(id);
-                //支持的硬件水平
-                Integer level = characteristics.get(
-                        CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-                //不支持，或者硬件水平有限的，跳过不使用
-                if (level == null ||
-                        level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
-                    continue;
-                }
+//                //支持的硬件水平
+//                Integer level = characteristics.get(
+//                        CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+//                //不支持，或者硬件水平有限的，跳过不使用
+//                if (level == null ||
+//                        level == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
+//                    continue;
+//                }
                 //相机的前后方向
                 Integer internal = characteristics.get(CameraCharacteristics.LENS_FACING);
                 if (internal == null) {
@@ -443,6 +469,7 @@ class Camera2 extends CameraViewImpl {
     }
 
     List<android.util.Size> mVideoSizes;
+    private Integer mSensorOrientation;
 
     /**
      * <p>Collects some information from {@link #mCameraCharacteristics}.</p>
@@ -483,6 +510,9 @@ class Camera2 extends CameraViewImpl {
         if (!mPreviewSizes.ratios().contains(mAspectRatio)) {
             mAspectRatio = mPreviewSizes.ratios().iterator().next();
         }
+
+        //获取摄像头方向
+        mSensorOrientation = mCameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
     }
 
     protected void collectPictureSizes(SizeMap sizes, StreamConfigurationMap map) {
@@ -514,6 +544,7 @@ class Camera2 extends CameraViewImpl {
             return;
         }
         closePreviewSession();
+        closeVideoSession();
 
         Size previewSize = chooseOptimalSize();
         mPreview.setBufferSize(previewSize.getWidth(), previewSize.getHeight());
@@ -624,6 +655,13 @@ class Camera2 extends CameraViewImpl {
         }
     }
 
+    private void closeVideoSession() {
+        if (mVideoSession != null) {
+            mVideoSession.close();
+            mVideoSession = null;
+        }
+    }
+
 
     /**
      * 创建录像 session
@@ -635,6 +673,7 @@ class Camera2 extends CameraViewImpl {
         try {
             //关闭预览会话
             closePreviewSession();
+            closeVideoSession();
 
             mVideoRequestBuilder = mCamera.createCaptureRequest(
                     CameraDevice.TEMPLATE_RECORD);
@@ -684,7 +723,8 @@ class Camera2 extends CameraViewImpl {
             // Once the session starts, we can update the UI and start recording
             mCamera.createCaptureSession(
                     Arrays.asList(mPreview.getSurface(), mediaRecorder.getSurface()),
-                    mVideoSessionCallback, null);
+                    mVideoSessionCallback
+                    , null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }

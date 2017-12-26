@@ -91,7 +91,7 @@ public class CameraView extends FrameLayout {
     @SuppressWarnings("WrongConstant")
     public CameraView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        if (isInEditMode()){
+        if (isInEditMode()) {
             mCallbacks = null;
             mDisplayOrientationDetector = null;
             return;
@@ -158,7 +158,7 @@ public class CameraView extends FrameLayout {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (isInEditMode()){
+        if (isInEditMode()) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
             return;
         }
@@ -247,7 +247,7 @@ public class CameraView extends FrameLayout {
     public void start() {
         if (!mImpl.start()) {
             //store the state ,and restore this state after fall back o Camera1
-            Parcelable state=onSaveInstanceState();
+            Parcelable state = onSaveInstanceState();
             // Camera2 uses legacy hardware layer; fall back to Camera1
             mImpl = new Camera1(mCallbacks, createPreviewImpl(getContext()));
             onRestoreInstanceState(state);
@@ -468,6 +468,7 @@ public class CameraView extends FrameLayout {
         public void onVideoRecordStop() {
             mMediaRecorder.stop();
             mMediaRecorder.reset();
+            mMediaRecorder = null;
         }
 
         public void reserveRequestLayoutOnOpen() {
@@ -563,6 +564,7 @@ public class CameraView extends FrameLayout {
         if (mMediaRecorder == null) {
             mMediaRecorder = new MediaRecorder();
         }
+
         //输入音视频源
         mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
@@ -580,13 +582,18 @@ public class CameraView extends FrameLayout {
         mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
     }
 
-    public void startVideoRecord(int width, int height) {
+    public void startVideoRecord(int width, int height, int oritation) {
         //Todo 屏幕方向，分辨率，camera
-        mImpl.startVideoRecord(mMediaRecorder,width,height);
+        mImpl.startVideoRecord(mMediaRecorder, width, height, oritation);
     }
 
     public void stopVideoRecord() {
         mImpl.stopVideoRecord(mMediaRecorder);
+    }
+
+    public void switchCamera() {
+        mImpl.setFacing(mImpl.getFacing() == CameraView.FACING_FRONT ?
+                CameraView.FACING_BACK : CameraView.FACING_FRONT);
     }
 
 

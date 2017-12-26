@@ -28,6 +28,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.StringRes;
 import android.support.design.widget.FloatingActionButton;
@@ -43,6 +44,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
 import com.google.android.cameraview.AspectRatio;
@@ -93,17 +95,31 @@ public class MainActivity extends AppCompatActivity implements
 
     private Handler mBackgroundHandler;
 
+    private Button mButtonSwitch;
+
+    boolean isRecord;
+    String dir = null;
     private View.OnClickListener mOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
             switch (v.getId()) {
                 case R.id.take_picture:
-                    if (mCameraView != null) {
-//                        mCameraView.takePicture();
-                        String dir = getExternalFilesDir(null).getAbsolutePath()+"/picture.mp4";
-                        Log.e(TAG, "onClick: "+ dir );
+
+                    if (!isRecord) {
+                        isRecord = true;
+                        Toast.makeText(MainActivity.this, "录像开始", Toast.LENGTH_SHORT).show();
+                        dir = getExternalFilesDir(null).getAbsolutePath() + "/"
+                                + System.currentTimeMillis() + ".mp4";
+                        Log.e(TAG, "onClick: " + dir);
                         mCameraView.initMediaRecorder(dir);
-                        mCameraView.startVideoRecord(854,480);
+                        mCameraView.startVideoRecord(854, 480,
+                                MainActivity.this.getWindowManager().getDefaultDisplay()
+                                        .getRotation());
+                    } else {
+                        isRecord = false;
+                        Toast.makeText(MainActivity.this, "录像结束-->路径：" + dir,
+                                Toast.LENGTH_SHORT).show();
+                        mCameraView.stopVideoRecord();
                     }
                     break;
             }
@@ -111,12 +127,20 @@ public class MainActivity extends AppCompatActivity implements
     };
 
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mCameraView = (CameraView) findViewById(R.id.camera);
+        mButtonSwitch = (Button) findViewById(R.id.btn_switch);
+        mButtonSwitch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mCameraView.switchCamera();
+            }
+        });
+
+
         if (mCameraView != null) {
             mCameraView.addCallback(mCallback);
         }
@@ -200,15 +224,14 @@ public class MainActivity extends AppCompatActivity implements
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.aspect_ratio:
-//                FragmentManager fragmentManager = getSupportFragmentManager();
-//                if (mCameraView != null
-//                        && fragmentManager.findFragmentByTag(FRAGMENT_DIALOG) == null) {
-//                    final Set<AspectRatio> ratios = mCameraView.getSupportedAspectRatios();
-//                    final AspectRatio currentRatio = mCameraView.getAspectRatio();
-//                    AspectRatioFragment.newInstance(ratios, currentRatio)
-//                            .show(fragmentManager, FRAGMENT_DIALOG);
-//                }
-                mCameraView.stopVideoRecord();
+                FragmentManager fragmentManager = getSupportFragmentManager();
+                if (mCameraView != null
+                        && fragmentManager.findFragmentByTag(FRAGMENT_DIALOG) == null) {
+                    final Set<AspectRatio> ratios = mCameraView.getSupportedAspectRatios();
+                    final AspectRatio currentRatio = mCameraView.getAspectRatio();
+                    AspectRatioFragment.newInstance(ratios, currentRatio)
+                            .show(fragmentManager, FRAGMENT_DIALOG);
+                }
                 return true;
             case R.id.switch_flash:
                 if (mCameraView != null) {
