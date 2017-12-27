@@ -372,7 +372,21 @@ class Camera2 extends CameraViewImpl {
 
     @Override
     void startVideoRecord(MediaRecorder mediaRecorder, int width, int height, int oritation) {
-        android.util.Size videoSize = getOptimalSize(mVideoSizes, width, height);
+        //输入音视频源
+        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
+        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+        //输出格式
+        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+
+        //编码比特率
+        mediaRecorder.setVideoEncodingBitRate(10 * 1024 * 1024);
+        //帧率
+        mediaRecorder.setVideoFrameRate(30);
+        //视频编码格式
+        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+        //音频编码格式
+        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+
         //屏幕方向
         switch (mSensorOrientation) {
             case SENSOR_ORIENTATION_DEFAULT_DEGREES:
@@ -383,7 +397,11 @@ class Camera2 extends CameraViewImpl {
                 break;
         }
 
+        //分辨率
+        android.util.Size videoSize = getOptimalSize(mVideoSizes, width, height);
         mediaRecorder.setVideoSize(videoSize.getWidth(), videoSize.getHeight());
+
+
 
         mCallback.onMediaRecordInit();
 
