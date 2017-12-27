@@ -407,7 +407,7 @@ public class CameraView extends FrameLayout {
      */
     public void takePicture() {
     }
-
+    String videoPath;
     private class CallbackBridge implements CameraViewImpl.Callback {
 
         private final ArrayList<Callback> mCallbacks = new ArrayList<>();
@@ -452,6 +452,7 @@ public class CameraView extends FrameLayout {
 
         @Override
         public void onMediaRecordInit() {
+            mMediaRecorder.setOutputFile(videoPath);
             try {
                 mMediaRecorder.prepare();
             } catch (IOException e) {
@@ -468,6 +469,7 @@ public class CameraView extends FrameLayout {
         public void onVideoRecordStop() {
             mMediaRecorder.stop();
             mMediaRecorder.reset();
+            mMediaRecorder.release();
             mMediaRecorder = null;
         }
 
@@ -564,22 +566,23 @@ public class CameraView extends FrameLayout {
         if (mMediaRecorder == null) {
             mMediaRecorder = new MediaRecorder();
         }
+        this.videoPath = videoPath;
 
-        //输入音视频源
-        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+//        //输入音视频源
+//        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
+//        mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         //输出格式
-        mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+//        mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
         //文件路径
-        mMediaRecorder.setOutputFile(videoPath);
+//        mMediaRecorder.setOutputFile(videoPath);
         //编码比特率
-        mMediaRecorder.setVideoEncodingBitRate(10 * 1024 * 1024);
+//        mMediaRecorder.setVideoEncodingBitRate(10 * 1024 * 1024);
         //帧率
-        mMediaRecorder.setVideoFrameRate(30);
-        //视频编码格式
-        mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-        //音频编码格式
-        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+//        mMediaRecorder.setVideoFrameRate(30);
+////        视频编码格式
+//        mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+////        音频编码格式
+//        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
     }
 
     public void startVideoRecord(int width, int height, int oritation) {

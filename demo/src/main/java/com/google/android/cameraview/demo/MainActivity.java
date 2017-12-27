@@ -104,11 +104,10 @@ public class MainActivity extends AppCompatActivity implements
         public void onClick(View v) {
             switch (v.getId()) {
                 case R.id.take_picture:
-
                     if (!isRecord) {
                         isRecord = true;
                         Toast.makeText(MainActivity.this, "录像开始", Toast.LENGTH_SHORT).show();
-                        dir = getExternalFilesDir(null).getAbsolutePath() + "/"
+                        dir = getExternalFilesDir(Environment.DIRECTORY_MOVIES) + "/"
                                 + System.currentTimeMillis() + ".mp4";
                         Log.e(TAG, "onClick: " + dir);
                         mCameraView.initMediaRecorder(dir);

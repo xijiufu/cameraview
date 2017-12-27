@@ -19,6 +19,7 @@ package com.google.android.cameraview;
 import android.annotation.SuppressLint;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
+import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.support.v4.util.SparseArrayCompat;
@@ -90,12 +91,16 @@ class Camera1 extends CameraViewImpl {
 
     @Override
     boolean start() {
+        //相机设备选择
         chooseCamera();
+        //打开相机
         openCamera();
+        //预览与渲染控件绑定
         if (mPreview.isReady()) {
             setUpPreview();
         }
         mShowingPreview = true;
+        //开始预览
         mCamera.startPreview();
         return true;
     }
@@ -109,7 +114,9 @@ class Camera1 extends CameraViewImpl {
         releaseCamera();
     }
 
-    // Suppresses Camera#setPreviewTexture
+    /**
+     * 将相机设备与预览控件绑定
+     */
     @SuppressLint("NewApi")
     void setUpPreview() {
         try {
@@ -222,8 +229,9 @@ class Camera1 extends CameraViewImpl {
     }
 
     private boolean isVideoRecording = false;
+
     @Override
-    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height,int oritation) {
+    void startVideoRecord(MediaRecorder mediaRecorder, int width, int height, int oritation) {
         if (!isCameraOpened()) {
             throw new IllegalStateException(
                     "Camera is not ready. Call start() before startVideoRecord().");
@@ -232,25 +240,34 @@ class Camera1 extends CameraViewImpl {
             throw new IllegalStateException(
                     "mediaRecorder is null.");
         }
-        //方向
-        mediaRecorder.setOrientationHint(calcCameraRotation(mDisplayOrientation));
-        CameraSize videoSize = getOptimalSize(mVideoSizes,width,height);
-        //分辨率
-        mediaRecorder.setVideoSize(videoSize.getWidth(),videoSize.getHeight());
+
+        mCamera.unlock();
         //camera
         mediaRecorder.setCamera(mCamera);
+        //输入音视频源
+        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
+        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+        //方向
+        mediaRecorder.setOrientationHint(calcCameraRotation(mDisplayOrientation));
+        //分辨率
+        CameraSize videoSize = getOptimalSize(mVideoSizes, width, height);
 
-        try {
-            mediaRecorder.prepare();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
+        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_480P);
+        profile.fileFormat = MediaRecorder.OutputFormat.MPEG_4;
 
+        profile.videoCodec = MediaRecorder.VideoEncoder.H264;
+        profile.videoFrameHeight = videoSize.getHeight();
+        profile.videoFrameWidth = videoSize.getWidth();
+
+        profile.audioCodec = MediaRecorder.AudioEncoder.AAC;
+//        profile.audioSampleRate = ;
+//        profile.audioBitRate = ;
+
+        mediaRecorder.setProfile(profile);
+
+
+        isVideoRecording = true;
         mCallback.onMediaRecordInit();
-
-        mediaRecorder.start();
-        isVideoRecording  = true;
         mCallback.onVideoRecordStart();
     }
 
@@ -260,13 +277,18 @@ class Camera1 extends CameraViewImpl {
             throw new IllegalStateException(
                     "MediaRecorder is null.");
         }
-        if (!isVideoRecording){
+        if (!isVideoRecording) {
             throw new IllegalStateException(
                     "VideoRecord not start.");
         }
 
-        mediaRecorder.stop();
         mCallback.onVideoRecordStop();
+        try {
+            mCamera.reconnect();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        mCamera.startPreview();
     }
 
     void takePictureInternal() {
@@ -304,7 +326,7 @@ class Camera1 extends CameraViewImpl {
     }
 
     /**
-     * This rewrites {@link #mCameraId} and {@link #mCameraInfo}.
+     * ① 获取指定方向的摄像头 id
      */
     private void chooseCamera() {
         for (int i = 0, count = Camera.getNumberOfCameras(); i < count; i++) {
@@ -317,38 +339,48 @@ class Camera1 extends CameraViewImpl {
         mCameraId = INVALID_CAMERA_ID;
     }
 
+    /**
+     * ②打开相机，获取相机设备
+     */
     private void openCamera() {
+        //释放资源
         if (mCamera != null) {
             releaseCamera();
         }
+        //相机对象
         mCamera = Camera.open(mCameraId);
+        //相机参数
         mCameraParameters = mCamera.getParameters();
-        // Supported preview sizes
+        //支持的预览分辨率
         mPreviewSizes.clear();
         for (Camera.Size size : mCameraParameters.getSupportedPreviewSizes()) {
             mPreviewSizes.add(new Size(size.width, size.height));
         }
-        // Supported picture sizes;
+        //支持的图片分辨率
         mPictureSizes.clear();
         for (Camera.Size size : mCameraParameters.getSupportedPictureSizes()) {
             mPictureSizes.add(new Size(size.width, size.height));
         }
-        //Supported video sizes;
+        //支持的视频分辨率
         mVideoSizes.clear();
         for (Camera.Size size : mCameraParameters.getSupportedVideoSizes()) {
             mVideoSizes.add(size);
         }
-        // AspectRatio
+        //宽高比
         if (mAspectRatio == null) {
             mAspectRatio = Constants.DEFAULT_ASPECT_RATIO;
         }
+        //调整相机参数
         adjustCameraParameters();
+        //相机显示的方向
         mCamera.setDisplayOrientation(calcDisplayOrientation(mDisplayOrientation));
+
         mCallback.onCameraOpened();
     }
 
     private AspectRatio chooseAspectRatio() {
         AspectRatio r = null;
+        //预览支持的宽高比
         for (AspectRatio ratio : mPreviewSizes.ratios()) {
             r = ratio;
             if (ratio.equals(Constants.DEFAULT_ASPECT_RATIO)) {
@@ -359,25 +391,37 @@ class Camera1 extends CameraViewImpl {
     }
 
     void adjustCameraParameters() {
+        //匹配与宽高比相同的分辨率
         SortedSet<Size> sizes = mPreviewSizes.sizes(mAspectRatio);
         if (sizes == null) { // Not supported
             mAspectRatio = chooseAspectRatio();
             sizes = mPreviewSizes.sizes(mAspectRatio);
         }
+        //相机支持的，最接近预设的分辨率
         Size size = chooseOptimalSize(sizes);
 
         // Always re-apply camera parameters
         // Largest picture size in this ratio
         final Size pictureSize = mPictureSizes.sizes(mAspectRatio).last();
+
+        //※关闭预览
         if (mShowingPreview) {
             mCamera.stopPreview();
         }
+        //设置预览分辨率
         mCameraParameters.setPreviewSize(size.getWidth(), size.getHeight());
+        //设置图片分辨率
         mCameraParameters.setPictureSize(pictureSize.getWidth(), pictureSize.getHeight());
+        //设置相机朝向
         mCameraParameters.setRotation(calcCameraRotation(mDisplayOrientation));
+        //自动对焦
         setAutoFocusInternal(mAutoFocus);
+        //闪光灯
         setFlashInternal(mFlash);
+        //生效
         mCamera.setParameters(mCameraParameters);
+
+        //※开始预览
         if (mShowingPreview) {
             mCamera.startPreview();
         }
@@ -409,8 +453,6 @@ class Camera1 extends CameraViewImpl {
         }
         return result;
     }
-
-
 
 
     private void releaseCamera() {
