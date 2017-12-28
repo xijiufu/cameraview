@@ -49,6 +49,7 @@ import android.widget.Toast;
 
 import com.google.android.cameraview.AspectRatio;
 import com.google.android.cameraview.CameraView;
+import com.google.android.cameraview.VideoConfig;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -110,10 +111,7 @@ public class MainActivity extends AppCompatActivity implements
                         dir = getExternalFilesDir(Environment.DIRECTORY_MOVIES) + "/"
                                 + System.currentTimeMillis() + ".mp4";
                         Log.e(TAG, "onClick: " + dir);
-                        mCameraView.initMediaRecorder(dir);
-                        mCameraView.startVideoRecord(854, 480,
-                                MainActivity.this.getWindowManager().getDefaultDisplay()
-                                        .getRotation());
+                        mCameraView.startVideoRecord(new VideoConfig(),dir);
                     } else {
                         isRecord = false;
                         Toast.makeText(MainActivity.this, "录像结束-->路径：" + dir,
