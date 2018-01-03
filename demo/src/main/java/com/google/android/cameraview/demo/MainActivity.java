@@ -138,9 +138,9 @@ public class MainActivity extends AppCompatActivity implements
         });
 
 
-        if (mCameraView != null) {
-            mCameraView.addCallback(mCallback);
-        }
+//        if (mCameraView != null) {
+//            mCameraView.addCallback(mCallback);
+//        }
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.take_picture);
         if (fab != null) {
             fab.setOnClickListener(mOnClickListener);
@@ -266,50 +266,50 @@ public class MainActivity extends AppCompatActivity implements
         return mBackgroundHandler;
     }
 
-    private CameraView.Callback mCallback
-            = new CameraView.Callback() {
-
-        @Override
-        public void onCameraOpened(CameraView cameraView) {
-            Log.d(TAG, "onCameraOpened");
-        }
-
-        @Override
-        public void onCameraClosed(CameraView cameraView) {
-            Log.d(TAG, "onCameraClosed");
-        }
-
-        @Override
-        public void onPictureTaken(CameraView cameraView, final byte[] data) {
-            Log.d(TAG, "onPictureTaken " + data.length);
-            Toast.makeText(cameraView.getContext(), R.string.picture_taken, Toast.LENGTH_SHORT)
-                    .show();
-            getBackgroundHandler().post(new Runnable() {
-                @Override
-                public void run() {
-                    File file = new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-                            "picture.jpg");
-                    OutputStream os = null;
-                    try {
-                        os = new FileOutputStream(file);
-                        os.write(data);
-                        os.close();
-                    } catch (IOException e) {
-                        Log.w(TAG, "Cannot write to " + file, e);
-                    } finally {
-                        if (os != null) {
-                            try {
-                                os.close();
-                            } catch (IOException e) {
-                                // Ignore
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-    };
+//    private CameraView.Callback mCallback
+//            = new CameraView.Callback() {
+//
+//        @Override
+//        public void onCameraOpened(CameraView cameraView) {
+//            Log.d(TAG, "onCameraOpened");
+//        }
+//
+//        @Override
+//        public void onCameraClosed(CameraView cameraView) {
+//            Log.d(TAG, "onCameraClosed");
+//        }
+//
+//        @Override
+//        public void onPictureTaken(CameraView cameraView, final byte[] data) {
+//            Log.d(TAG, "onPictureTaken " + data.length);
+//            Toast.makeText(cameraView.getContext(), R.string.picture_taken, Toast.LENGTH_SHORT)
+//                    .show();
+//            getBackgroundHandler().post(new Runnable() {
+//                @Override
+//                public void run() {
+//                    File file = new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+//                            "picture.jpg");
+//                    OutputStream os = null;
+//                    try {
+//                        os = new FileOutputStream(file);
+//                        os.write(data);
+//                        os.close();
+//                    } catch (IOException e) {
+//                        Log.w(TAG, "Cannot write to " + file, e);
+//                    } finally {
+//                        if (os != null) {
+//                            try {
+//                                os.close();
+//                            } catch (IOException e) {
+//                                // Ignore
+//                            }
+//                        }
+//                    }
+//                }
+//            });
+//        }
+//
+//    };
 
     public static class ConfirmationDialogFragment extends DialogFragment {
 

@@ -16,37 +16,41 @@
 
 package com.google.android.cameraview;
 
-import android.media.MediaRecorder;
-
 /**
  * -----------------------------------------------------------------
  * User:songfei
  * Email:autismbug@163.com
  * Version:1.0
- * Time:2017/12/2017/12/28--09:15
+ * Time:2018/01/2018/1/2--10:40
  * Function:
  * ModifyHistory:
  * -----------------------------------------------------------------
  */
-public interface VideoConfigDefault {
-//    int audioSource = MediaRecorder.AudioSource.DEFAULT;
-//    int videoSource = MediaRecorder.VideoSource.CAMERA;
-    int outputFormat = MediaRecorder.OutputFormat.MPEG_4;
+public interface CameraViewCallback {
+    //相机打开
+    void onCameraOpened(CameraView cameraView);
 
-    int videoCodec = MediaRecorder.VideoEncoder.H264;
-    int audioCodec = MediaRecorder.AudioEncoder.AAC;
+    //相机关闭
+    void onCameraClosed(CameraView cameraView);
 
-    int width = 854;
-    int height = 480;
+    //相机初始化成功
+    void onCameraInit(CameraView cameraView, int cameraApiLevel);
 
-    int videoBitRate = 5242880;
-    int videoFrameRate = 30;
+    //切换摄像头成功
+    void onCameraSwitch(CameraView cameraView, int face);
 
-    int audioSampleRate = 44100;
-    int audioBitRate = 16;
+    //开始录制成功
+    void onMediaRecordStartSucceed(CameraView cameraView, VideoConfig videoConfig);
 
-    int audioChannels = 2;
-    int quality = 100;
+    //开始录制失败
+    void onMediaRecordStartFailed(CameraView cameraView, String message);
 
-    int oritation = 0;
+    //停止录制成功
+    void onMediaRecordStopSucceed(CameraView cameraView, String videoPath);
+
+    //停止录制失败
+    void onMediaRecordStopFailed(CameraView cameraView, String message);
+
+    //其它异常信息
+    void onErrorMessage(CameraView cameraView, String message, Exception e);
 }

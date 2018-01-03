@@ -68,24 +68,29 @@ abstract class CameraViewImpl {
 
     abstract void setDisplayOrientation(int displayOrientation);
 
-    abstract void startVideoRecord(MediaRecorder mediaRecorder, VideoConfig videoConfig);
+    abstract void startVideoRecord(MediaRecorder mediaRecorder, VideoConfig videoConfig,String videoPath);
 
     abstract void stopVideoRecord(MediaRecorder mediaRecorder);
 
     interface Callback {
-
+        //相机打开
         void onCameraOpened();
-
+        //相机关闭
         void onCameraClosed();
-
-        void onPictureTaken(byte[] data);
-
-        void onMediaRecordInit();
-
-        void onVideoRecordStart();
-
-        void onVideoRecordStop();
-
+        //相机初始化成功
+        void onCameraInit(int cameraApiLevel);
+        //切换摄像头成功
+        void onCameraSwitch(int face);
+        //开始录制成功
+        void onMediaRecordStartSucceed(VideoConfig videoConfig);
+        //开始录制失败
+        void onMediaRecordStartFailed(String message);
+        //停止录制成功
+        void onMediaRecordStopSucceed(String videoPath);
+        //停止录制失败
+        void onMediaRecordStopFailed(String message);
+        //其它异常信息
+        void onErrorMessage(String message,Exception e);
     }
 
 }

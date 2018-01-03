@@ -32,7 +32,6 @@ import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.widget.FrameLayout;
 
-import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -272,21 +271,15 @@ public class CameraView extends FrameLayout {
 
     /**
      * Add a new callback.
-     *
-     * @param callback The {@link Callback} to add.
-     * @see #removeCallback(Callback)
      */
-    public void addCallback(@NonNull Callback callback) {
+    public void addCallback(@NonNull CameraViewCallback callback) {
         mCallbacks.add(callback);
     }
 
     /**
      * Remove a callback.
-     *
-     * @param callback The {@link Callback} to remove.
-     * @see #addCallback(Callback)
      */
-    public void removeCallback(@NonNull Callback callback) {
+    public void removeCallback(@NonNull CameraViewCallback callback) {
         mCallbacks.remove(callback);
     }
 
@@ -401,27 +394,26 @@ public class CameraView extends FrameLayout {
         return mImpl.getFlash();
     }
 
-    /**
-     * Take a picture. The result will be returned to
-     * {@link Callback#onPictureTaken(CameraView, byte[])}.
-     */
-    public void takePicture() {
-    }
+
     private class CallbackBridge implements CameraViewImpl.Callback {
 
-        private final ArrayList<Callback> mCallbacks = new ArrayList<>();
+        private final ArrayList<CameraViewCallback> mCallbacks = new ArrayList<>();
 
         private boolean mRequestLayoutOnOpen;
 
         CallbackBridge() {
         }
 
-        public void add(Callback callback) {
+        public void add(CameraViewCallback callback) {
             mCallbacks.add(callback);
         }
 
-        public void remove(Callback callback) {
+        public void remove(CameraViewCallback callback) {
             mCallbacks.remove(callback);
+        }
+
+        public void reserveRequestLayoutOnOpen() {
+            mRequestLayoutOnOpen = true;
         }
 
         @Override
@@ -430,50 +422,74 @@ public class CameraView extends FrameLayout {
                 mRequestLayoutOnOpen = false;
                 requestLayout();
             }
-            for (Callback callback : mCallbacks) {
+            for (CameraViewCallback callback : mCallbacks) {
                 callback.onCameraOpened(CameraView.this);
             }
         }
 
         @Override
         public void onCameraClosed() {
-            for (Callback callback : mCallbacks) {
+            for (CameraViewCallback callback : mCallbacks) {
                 callback.onCameraClosed(CameraView.this);
             }
         }
 
         @Override
-        public void onPictureTaken(byte[] data) {
-            for (Callback callback : mCallbacks) {
-                callback.onPictureTaken(CameraView.this, data);
+        public void onCameraInit(int cameraApiLevel) {
+            for (CameraViewCallback callback : mCallbacks) {
+                callback.onCameraInit(CameraView.this, cameraApiLevel);
             }
         }
 
         @Override
-        public void onMediaRecordInit() {
-            try {
-                mMediaRecorder.prepare();
-            } catch (IOException e) {
-                e.printStackTrace();
+        public void onCameraSwitch(int face) {
+            for (CameraViewCallback callback : mCallbacks) {
+                callback.onCameraSwitch(CameraView.this, face);
             }
         }
 
         @Override
-        public void onVideoRecordStart() {
+        public void onMediaRecordStartSucceed(VideoConfig videoConfig) {
             mMediaRecorder.start();
+
+            for (CameraViewCallback callback : mCallbacks) {
+                callback.onMediaRecordStartSucceed(CameraView.this, videoConfig);
+            }
         }
 
         @Override
-        public void onVideoRecordStop() {
+        public void onMediaRecordStartFailed(String message) {
+            for (CameraViewCallback callback : mCallbacks) {
+                callback.onMediaRecordStartFailed(CameraView.this, message);
+            }
+        }
+
+        @Override
+        public void onMediaRecordStopSucceed(String videoPath) {
             mMediaRecorder.stop();
             mMediaRecorder.reset();
             mMediaRecorder.release();
             mMediaRecorder = null;
+
+            for (CameraViewCallback callback : mCallbacks) {
+                callback.onMediaRecordStopSucceed(CameraView.this, videoPath);
+            }
         }
 
-        public void reserveRequestLayoutOnOpen() {
-            mRequestLayoutOnOpen = true;
+        @Override
+        public void onMediaRecordStopFailed(String message) {
+            for (CameraViewCallback callback : mCallbacks) {
+                callback.onMediaRecordStopFailed(CameraView.this, message);
+            }
         }
+
+        @Override
+        public void onErrorMessage(String message, Exception e) {
+            for (CameraViewCallback callback : mCallbacks) {
+                callback.onErrorMessage(CameraView.this, message, e);
+            }
+        }
+
     }
 
     protected static class SavedState extends BaseSavedState {
@@ -527,51 +543,20 @@ public class CameraView extends FrameLayout {
 
     }
 
-    /**
-     * Callback for monitoring events about {@link CameraView}.
-     */
-    @SuppressWarnings("UnusedParameters")
-    public abstract static class Callback {
 
-        /**
-         * Called when camera is opened.
-         *
-         * @param cameraView The associated {@link CameraView}.
-         */
-        public void onCameraOpened(CameraView cameraView) {
-        }
-
-        /**
-         * Called when camera is closed.
-         *
-         * @param cameraView The associated {@link CameraView}.
-         */
-        public void onCameraClosed(CameraView cameraView) {
-        }
-
-        /**
-         * Called when a picture is taken.
-         *
-         * @param cameraView The associated {@link CameraView}.
-         * @param data       JPEG data.
-         */
-        public void onPictureTaken(CameraView cameraView, byte[] data) {
-        }
-    }
-
-
-    private void initMediaRecorder(String videoPath) {
+    public void startVideoRecord(VideoConfig videoConfig, String videoPath) {
         if (mMediaRecorder == null) {
             mMediaRecorder = new MediaRecorder();
         }
-        //文件路径
-        mMediaRecorder.setOutputFile(videoPath);
-    }
-
-    public void startVideoRecord(VideoConfig videoConfig, String videoPath) {
-        initMediaRecorder(videoPath);
-        //Todo 屏幕方向，分辨率，camera
-        mImpl.startVideoRecord(mMediaRecorder, videoConfig);
+        mMediaRecorder.setOnErrorListener(new MediaRecorder.OnErrorListener() {
+            @Override
+            public void onError(MediaRecorder mr, int what, int extra) {
+                mCallbacks.onErrorMessage(
+                        "MediaRecord onError, what = " + what + ",extra = " + extra, null);
+            }
+        });
+        //开始录像
+        mImpl.startVideoRecord(mMediaRecorder, videoConfig, videoPath);
     }
 
     public void stopVideoRecord() {

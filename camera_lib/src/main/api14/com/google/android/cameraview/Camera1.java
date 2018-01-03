@@ -38,6 +38,8 @@ class Camera1 extends CameraViewImpl {
 
     private static final int INVALID_CAMERA_ID = -1;
 
+    public static final int CAMERA_LEVEL_1 = 1;
+
     private static final SparseArrayCompat<String> FLASH_MODES = new SparseArrayCompat<>();
 
     static {
@@ -76,6 +78,10 @@ class Camera1 extends CameraViewImpl {
 
     private int mDisplayOrientation;
 
+    private String mVideoPath;
+
+    private VideoConfig mVideoConfig;
+
     Camera1(Callback callback, PreviewImpl preview) {
         super(callback, preview);
         preview.setCallback(new PreviewImpl.Callback() {
@@ -87,6 +93,7 @@ class Camera1 extends CameraViewImpl {
                 }
             }
         });
+        mCallback.onCameraInit(CAMERA_LEVEL_1);
     }
 
     @Override
@@ -133,6 +140,7 @@ class Camera1 extends CameraViewImpl {
                 mCamera.setPreviewTexture((SurfaceTexture) mPreview.getSurfaceTexture());
             }
         } catch (IOException e) {
+            mCallback.onErrorMessage("初始化预览失败", e);
             throw new RuntimeException(e);
         }
     }
@@ -152,6 +160,7 @@ class Camera1 extends CameraViewImpl {
             stop();
             start();
         }
+        mCallback.onCameraSwitch(mFacing);
     }
 
     @Override
@@ -231,7 +240,13 @@ class Camera1 extends CameraViewImpl {
     private boolean isVideoRecording = false;
 
     @Override
-    void startVideoRecord(MediaRecorder mediaRecorder, VideoConfig videoConfig) {
+    void startVideoRecord(MediaRecorder mediaRecorder, VideoConfig videoConfig, String videoPath) {
+        mVideoPath = videoPath;
+        mVideoConfig = videoConfig;
+
+        //文件路径
+        mediaRecorder.setOutputFile(videoPath);
+
         if (!isCameraOpened()) {
             throw new IllegalStateException(
                     "Camera is not ready. Call start() before startVideoRecord().");
@@ -257,7 +272,8 @@ class Camera1 extends CameraViewImpl {
         profile.audioCodec = videoConfig.getAudioCodec();
 
         //分辨率
-        CameraSize videoSize = getOptimalSize(mVideoSizes, videoConfig.getWidth(), videoConfig.getHeight());
+        CameraSize videoSize = getOptimalSize(mVideoSizes, videoConfig.getWidth(),
+                videoConfig.getHeight());
         profile.videoFrameHeight = videoSize.getHeight();
         profile.videoFrameWidth = videoSize.getWidth();
         profile.videoFrameRate = videoConfig.getVideoFrameRate();
@@ -270,8 +286,12 @@ class Camera1 extends CameraViewImpl {
 
 
         isVideoRecording = true;
-        mCallback.onMediaRecordInit();
-        mCallback.onVideoRecordStart();
+        try {
+            mediaRecorder.prepare();
+        } catch (IOException e) {
+            mCallback.onErrorMessage("MediaRecorder prepare error", e);
+        }
+        mCallback.onMediaRecordStartSucceed(mVideoConfig);
     }
 
     @Override
@@ -285,28 +305,16 @@ class Camera1 extends CameraViewImpl {
                     "VideoRecord not start.");
         }
 
-        mCallback.onVideoRecordStop();
+        mCallback.onMediaRecordStopSucceed(mVideoPath);
+
         try {
             mCamera.reconnect();
         } catch (IOException e) {
-            e.printStackTrace();
+            mCallback.onErrorMessage("Camera reconnect error", e);
         }
         mCamera.startPreview();
     }
 
-    void takePictureInternal() {
-        if (!isPictureCaptureInProgress.getAndSet(true)) {
-            mCamera.takePicture(null, null, null, new Camera.PictureCallback() {
-                @Override
-                public void onPictureTaken(byte[] data, Camera camera) {
-                    isPictureCaptureInProgress.set(false);
-                    mCallback.onPictureTaken(data);
-                    camera.cancelAutoFocus();
-                    camera.startPreview();
-                }
-            });
-        }
-    }
 
     @Override
     void setDisplayOrientation(int displayOrientation) {

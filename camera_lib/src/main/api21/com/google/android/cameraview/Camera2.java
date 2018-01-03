@@ -26,16 +26,13 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
-import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.support.annotation.NonNull;
-import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.Surface;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +43,8 @@ import java.util.SortedSet;
 class Camera2 extends CameraViewImpl {
 
     private static final String TAG = "Camera2";
+
+    public static final int CAMERA_LEVEL_2 = 2;
     //前后摄像头
     private static final SparseIntArray INTERNAL_FACINGS = new SparseIntArray();
 
@@ -73,13 +72,11 @@ class Camera2 extends CameraViewImpl {
         public void onOpened(@NonNull CameraDevice camera) {
             //① CameraDevice
             mCamera = camera;
-            mCallback.onCameraOpened();
             startPreviewSession();
         }
 
         @Override
         public void onClosed(@NonNull CameraDevice camera) {
-            mCallback.onCameraClosed();
         }
 
         @Override
@@ -89,7 +86,7 @@ class Camera2 extends CameraViewImpl {
 
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
-            Log.e(TAG, "onError: " + camera.getId() + " (" + error + ")");
+            mCallback.onErrorMessage("onError: " + camera.getId() + " (" + error + ")", null);
             mCamera = null;
         }
 
@@ -112,15 +109,16 @@ class Camera2 extends CameraViewImpl {
             try {
                 mPreviewSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, null);
             } catch (CameraAccessException e) {
-                Log.e(TAG, "Failed to start camera preview because it couldn't access camera", e);
+                mCallback.onErrorMessage(
+                        "Failed to start camera preview because it couldn't access camera", e);
             } catch (IllegalStateException e) {
-                Log.e(TAG, "Failed to start camera preview.", e);
+                mCallback.onErrorMessage("Failed to start camera preview.", e);
             }
         }
 
         @Override
         public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-            Log.e(TAG, "Failed to configure capture session.");
+            mCallback.onErrorMessage("Failed to configure capture session.", null);
         }
 
         @Override
@@ -149,17 +147,18 @@ class Camera2 extends CameraViewImpl {
             try {
                 mVideoSession.setRepeatingRequest(mVideoRequestBuilder.build(), null, null);
             } catch (CameraAccessException e) {
-                Log.e(TAG, "Failed to start camera preview because it couldn't access camera", e);
+                mCallback.onErrorMessage(
+                        "Failed to start camera preview because it couldn't access camera.", e);
             } catch (IllegalStateException e) {
-                Log.e(TAG, "Failed to start camera preview.", e);
+                mCallback.onErrorMessage("Failed to start camera preview.", e);
             }
 
-            mCallback.onVideoRecordStart();
+            mCallback.onMediaRecordStartSucceed(mVideoConfig);
         }
 
         @Override
         public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-            Log.e(TAG, "Failed to configure capture session.");
+            mCallback.onErrorMessage("Failed to configure capture session.",null);
         }
 
         @Override
@@ -201,6 +200,10 @@ class Camera2 extends CameraViewImpl {
     private int mFlash;
 
     private int mDisplayOrientation;
+    //视频路径
+    private String mVideoPath;
+    //
+    private VideoConfig mVideoConfig;
 
     Camera2(Callback callback, PreviewImpl preview, Context context) {
         super(callback, preview);
@@ -214,6 +217,7 @@ class Camera2 extends CameraViewImpl {
                 startPreviewSession();
             }
         });
+        mCallback.onCameraInit(CAMERA_LEVEL_2);
     }
 
     @Override
@@ -262,6 +266,7 @@ class Camera2 extends CameraViewImpl {
             stop();
             start();
         }
+        mCallback.onCameraSwitch(mFacing);
     }
 
     @Override
@@ -309,6 +314,7 @@ class Camera2 extends CameraViewImpl {
                             null, null);
                 } catch (CameraAccessException e) {
                     mAutoFocus = !mAutoFocus; // Revert
+                    mCallback.onErrorMessage("相机访问异常", e);
                 }
             }
         }
@@ -334,6 +340,7 @@ class Camera2 extends CameraViewImpl {
                             null, null);
                 } catch (CameraAccessException e) {
                     mFlash = saved; // Revert
+                    mCallback.onErrorMessage("相机访问异常", e);
                 }
             }
         }
@@ -371,7 +378,10 @@ class Camera2 extends CameraViewImpl {
     }
 
     @Override
-    void startVideoRecord(MediaRecorder mediaRecorder, VideoConfig videoConfig) {
+    void startVideoRecord(MediaRecorder mediaRecorder, VideoConfig videoConfig, String videoPath) {
+        this.mVideoPath = videoPath;
+        //文件路径
+        mediaRecorder.setOutputFile(videoPath);
         //输入音视频源
         mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
@@ -405,15 +415,19 @@ class Camera2 extends CameraViewImpl {
         mediaRecorder.setVideoSize(videoSize.getWidth(), videoSize.getHeight());
 
 
-        mCallback.onMediaRecordInit();
+        try {
+            mediaRecorder.prepare();
+        } catch (IOException e) {
+            mCallback.onErrorMessage("MediaRecorder prepare error", e);
+        }
 
         startVideoRecordSession(mediaRecorder);
     }
 
     @Override
     void stopVideoRecord(MediaRecorder mediaRecorder) {
-        mCallback.onVideoRecordStop();
         startPreviewSession();
+        mCallback.onMediaRecordStopSucceed(mVideoPath);
     }
 
     /**
@@ -484,7 +498,8 @@ class Camera2 extends CameraViewImpl {
             mFacing = Constants.FACING_BACK;
             return true;
         } catch (CameraAccessException e) {
-            throw new RuntimeException("Failed to get a list of camera devices", e);
+            mCallback.onErrorMessage("Failed to get a list of camera devices", e);
+            return false;
         }
     }
 
@@ -550,7 +565,7 @@ class Camera2 extends CameraViewImpl {
         try {
             mCameraManager.openCamera(mCameraId, mCameraDeviceCallback, null);
         } catch (CameraAccessException e) {
-            throw new RuntimeException("Failed to open camera: " + mCameraId, e);
+            mCallback.onErrorMessage("Failed to open camera: " + mCameraId, e);
         }
     }
 
@@ -575,7 +590,7 @@ class Camera2 extends CameraViewImpl {
             mCamera.createCaptureSession(Arrays.asList(surface),
                     mPreviewSessionCallback, null);
         } catch (CameraAccessException e) {
-            throw new RuntimeException("Failed to start camera session");
+            mCallback.onErrorMessage("Failed to start camera session", e);
         }
     }
 
@@ -746,7 +761,7 @@ class Camera2 extends CameraViewImpl {
                     mVideoSessionCallback
                     , null);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
+            mCallback.onErrorMessage("Failed to start camera session", e);
         }
     }
 
