@@ -29,6 +29,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.support.annotation.NonNull;
+import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.Surface;
 
@@ -158,7 +159,7 @@ class Camera2 extends CameraViewImpl {
 
         @Override
         public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-            mCallback.onErrorMessage("Failed to configure capture session.",null);
+            mCallback.onErrorMessage("Failed to configure capture session.", null);
         }
 
         @Override
@@ -377,17 +378,19 @@ class Camera2 extends CameraViewImpl {
         INVERSE_ORIENTATIONS.append(Surface.ROTATION_270, 0);
     }
 
+    MediaRecorder mMediaRecorder;
+
     @Override
     void startVideoRecord(MediaRecorder mediaRecorder, VideoConfig videoConfig, String videoPath) {
         this.mVideoPath = videoPath;
-        //文件路径
-        mediaRecorder.setOutputFile(videoPath);
+        mMediaRecorder = mediaRecorder;
         //输入音视频源
         mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         //输出格式
         mediaRecorder.setOutputFormat(videoConfig.getOutputFormat());
-
+        //文件路径
+        mediaRecorder.setOutputFile(videoPath);
         //编码比特率
         mediaRecorder.setVideoEncodingBitRate(videoConfig.getVideoBitRate());
         //帧率
@@ -418,6 +421,7 @@ class Camera2 extends CameraViewImpl {
         try {
             mediaRecorder.prepare();
         } catch (IOException e) {
+            Log.e(TAG, "MediaRecord prepare ", e);
             mCallback.onErrorMessage("MediaRecorder prepare error", e);
         }
 
@@ -713,7 +717,7 @@ class Camera2 extends CameraViewImpl {
             mVideoRequestBuilder = mCamera.createCaptureRequest(
                     CameraDevice.TEMPLATE_RECORD);
 
-            mVideoRequestBuilder.addTarget(mediaRecorder.getSurface());
+            mVideoRequestBuilder.addTarget(mMediaRecorder.getSurface());
             mVideoRequestBuilder.addTarget(mPreview.getSurface());
 
             mVideoRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,

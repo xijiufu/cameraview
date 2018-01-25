@@ -450,7 +450,13 @@ public class CameraView extends FrameLayout {
 
         @Override
         public void onMediaRecordStartSucceed(VideoConfig videoConfig) {
-            mMediaRecorder.start();
+            try {
+                mMediaRecorder.start();
+            } catch (Exception e) {
+                for (CameraViewCallback callback : mCallbacks) {
+                    callback.onErrorMessage(CameraView.this, "MediaRecorder start fail.",e);
+                }
+            }
 
             for (CameraViewCallback callback : mCallbacks) {
                 callback.onMediaRecordStartSucceed(CameraView.this, videoConfig);
@@ -468,8 +474,6 @@ public class CameraView extends FrameLayout {
         public void onMediaRecordStopSucceed(String videoPath) {
             mMediaRecorder.stop();
             mMediaRecorder.reset();
-            mMediaRecorder.release();
-            mMediaRecorder = null;
 
             for (CameraViewCallback callback : mCallbacks) {
                 callback.onMediaRecordStopSucceed(CameraView.this, videoPath);
