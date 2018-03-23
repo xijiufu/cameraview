@@ -37,14 +37,15 @@ class SurfaceViewPreview extends PreviewImpl {
         holder.addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(SurfaceHolder h) {
+                if (!ViewCompat.isInLayout(mSurfaceView)) {
+                    dispatchSurfaceChanged();
+                }
             }
 
             @Override
             public void surfaceChanged(SurfaceHolder h, int format, int width, int height) {
                 setSize(width, height);
-                if (!ViewCompat.isInLayout(mSurfaceView)) {
-                    dispatchSurfaceChanged();
-                }
+
             }
 
             @Override

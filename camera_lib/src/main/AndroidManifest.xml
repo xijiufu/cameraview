@@ -11,8 +11,8 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 -->
-<manifest package="com.google.android.cameraview"
-          xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.google.android.cameraview">
 
     <uses-permission android:name="android.permission.CAMERA"/>
 
@@ -21,9 +21,11 @@
     <uses-feature
         android:name="android.hardware.camera.autofocus"
         android:required="false"/>
+
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+
     <application/>
 </manifest>

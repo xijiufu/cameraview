@@ -50,4 +50,12 @@
         app:useCompatPadding="true"
         tools:ignore="RelativeOverlap"/>
 
+    <Button
+        android:id="@+id/btn_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:text="切换前后置"/>
+
 </RelativeLayout>
