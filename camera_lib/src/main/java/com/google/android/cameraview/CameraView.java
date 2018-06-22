@@ -446,6 +446,7 @@ public class CameraView extends FrameLayout {
             for (CameraViewCallback callback : mCallbacks) {
                 callback.onCameraSwitch(CameraView.this, face);
             }
+            setAutoFocus(true);
         }
 
         @Override
@@ -568,8 +569,7 @@ public class CameraView extends FrameLayout {
     }
 
     public void switchCamera() {
-        mImpl.setFacing(mImpl.getFacing() == CameraView.FACING_FRONT ?
-                CameraView.FACING_BACK : CameraView.FACING_FRONT);
+        mImpl.setFacing(mImpl.getFacing() == CameraView.FACING_FRONT ?CameraView.FACING_BACK : CameraView.FACING_FRONT);
     }
 
 
